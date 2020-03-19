@@ -1,0 +1,8 @@
+[package]
+name = "bones"
+version = "0.0.1"
+authors = ["lance <lza_menace@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+irc = "0.13.6"

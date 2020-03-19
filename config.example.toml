@@ -1,0 +1,7 @@
+owners = ["yourmain"]
+nickname = "botname"
+server = "chat.freenode.net"
+port = 6697
+use_ssl = true
+channels = ["#random"]
+user_info = "I'm a test bot. Leave me be."
