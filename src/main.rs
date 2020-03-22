@@ -38,14 +38,12 @@ fn main() {
                     &channel,
                     "This feature is still being worked on.",
                 );
-            } else if message.contains("help") {
+            } else if message.contains("!help") {
                 let _ = client.send_privmsg(
                     &channel,
                     &help_msg,
                 );
             }
-
         }
-    })
-    .unwrap();
+    }).unwrap();
 }
