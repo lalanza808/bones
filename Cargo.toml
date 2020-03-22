@@ -6,3 +6,5 @@ edition = "2018"
 
 [dependencies]
 irc = "0.13.6"
+http = "0.2"
+openssl = { version = "0.10", features = ["vendored"] }
