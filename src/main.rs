@@ -1,10 +1,35 @@
 extern crate irc;
+extern crate tokio_postgres;
 
 use irc::client::prelude::{Client, ClientExt, Command, IrcClient};
+use tokio_postgres::{NoTls, Error};
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     println!("[DEBUG] Connecting to IRC server...");
     let client = IrcClient::new("config.toml").unwrap();
+
+    // Connect to the database.
+    let (pg_client, connection) = tokio_postgres::connect("host=localhost user=postgres password=postgres", NoTls)
+        .await?;
+
+    // The connection object performs the actual communication with the database,
+    // so spawn it off to run on its own.
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
+
+    // Now we can execute a simple statement that just returns its parameter.
+    let rows = pg_client
+        .query("SELECT $1::TEXT", &[&"hello world"])
+        .await?;
+
+    // And then check that we got back the same string we sent over.
+    let value: &str = rows[0].get(0);
+    assert_eq!(value, "hello world");
+
     client.identify().unwrap();
     client.for_each_incoming(|im| {
 
@@ -15,8 +40,10 @@ fn main() {
         if let Command::PRIVMSG(channel, message) = &im.command {
             let help_msg = vec![
                 format!("Hey there {}, here's what you can do.", &im.source_nickname().unwrap()),
-                "Say 'create:' to create a new listing, ie, 'create:This will be the title of your new post on the site'.".to_string(),
-                "Say 'delete:' to delete an existing listing, ie, 'delete:Name or ID of your post to delete'.".to_string(),
+                "Say '!create' followed by the title of your listing to create a new one.".to_string(),
+                "Example: '!create I am offering virtual guitar lessons/sessions'.".to_string(),
+                "Say '!delete' followed by the name or ID of an existing listing.".to_string(),
+                "Example: '!delete I am offering virtual guitar lessons/sessions'".to_string()
             ];
             let help_msg = help_msg.join(" ");
 
@@ -28,22 +55,15 @@ fn main() {
                 message
             );
 
-            if message.starts_with("create:") {
-                let _ = client.send_privmsg(
-                    &channel,
-                    "This feature is still being worked on.",
-                );
-            } else if message.starts_with("delete:") {
-                let _ = client.send_privmsg(
-                    &channel,
-                    "This feature is still being worked on.",
-                );
-            } else if message.contains("!help") {
-                let _ = client.send_privmsg(
-                    &channel,
-                    &help_msg,
-                );
+            if message.starts_with("!create") {
+                let _ = client.send_privmsg(&channel, "This feature is still being worked on.");
+            } else if message.starts_with("!delete") {
+                let _ = client.send_privmsg(&channel, "This feature is still being worked on.");
+            } else if message.starts_with("!help") {
+                let _ = client.send_privmsg(&channel, &help_msg);
             }
         }
     }).unwrap();
+
+    Ok(())
 }
