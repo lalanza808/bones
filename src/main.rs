@@ -38,6 +38,8 @@ async fn main() -> Result<(), Error> {
         }
 
         if let Command::PRIVMSG(channel, message) = &im.command {
+            let src_nick = &im.source_nickname().unwrap();
+
             let help_msg = vec![
                 format!("Hey there {}, here's what you can do.", &im.source_nickname().unwrap()),
                 "Say '!create' followed by the title of your listing to create a new one.".to_string(),
@@ -51,12 +53,22 @@ async fn main() -> Result<(), Error> {
             println!(
                 "[{}][{}]: {}",
                 &im.response_target().unwrap(),
-                &im.source_nickname().unwrap(),
+                src_nick,
                 message
             );
 
             if message.starts_with("!create") {
-                let _ = client.send_privmsg(&channel, "This feature is still being worked on.");
+                let user_msg = message.split(" ");
+                let mut user_msg: Vec<&str> = user_msg.collect();
+                user_msg.remove(0);
+                let user_msg = user_msg.join(" ");
+                println!("it looks like you said: '{:?}' - Trying to save to the DB", user_msg);
+                // pg_client.query(
+                //     "INSERT INTO posts (nick, post_title) VALUES ('$1', '$2')",
+                //     &[src_nick, &user_msg]
+                // );
+                // let value: &str = rows2[0].get(0);
+                // println!("{}", value);
             } else if message.starts_with("!delete") {
                 let _ = client.send_privmsg(&channel, "This feature is still being worked on.");
             } else if message.starts_with("!help") {
