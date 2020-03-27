@@ -1,26 +1,22 @@
 extern crate irc;
-extern crate tokio_postgres;
+extern crate postgres;
 
 use irc::client::prelude::{ClientExt, Command, Config, IrcReactor};
-use tokio_postgres::{NoTls, Error, Client};
+use postgres::{NoTls, Client};
 
-#[tokio::main]
-async fn main() -> Result<(), Error> {
+
+fn main() {
+    // Connect to IRC server
     println!("[DEBUG] Connecting to IRC server...");
     let irc_config = Config::load("config.toml").unwrap();
-    let (pg_client, connection) = tokio_postgres::connect("host=localhost user=postgres password=postgres", NoTls)
-        .await?;
     let mut reactor = IrcReactor::new().unwrap();
     let irc_client = reactor.prepare_client_and_connect(&irc_config).unwrap();
     irc_client.identify().unwrap();
 
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
-
     reactor.register_client_with_handler(irc_client, |c, m| {
+        // Connect to database
+        let mut pg_client = Client::connect("host=localhost user=postgres password=postgres dbname=communitybot", NoTls).unwrap();
+
         if let Command::NOTICE(channel, message) = &m.command {
             println!("[{:?}][{}]: {}", &m.response_target(), &channel, &message);
         }
@@ -46,8 +42,19 @@ async fn main() -> Result<(), Error> {
                 let mut user_msg: Vec<&str> = user_msg.collect();
                 user_msg.remove(0);
                 let user_msg = user_msg.join(" ");
-                println!("it looks like you said: {:?} - Trying to save to the DB", user_msg);
-                // save to db
+                let query_res = pg_client.query_one(
+                    "INSERT INTO posts (nick, post_title) VALUES ($1, $2) RETURNING id",
+                    &[&src_nick, &user_msg]
+                );
+                match query_res {
+                    Ok(row) => {
+                        let post_id: i32 = row.get("id");
+                        c.send_privmsg(&channel, format!("Created new post: {}!", post_id));
+                    },
+                    Err(err) => {
+                        c.send_privmsg(&channel, format!("There was an error storing to DB! {}", err));
+                    }
+                };
             } else if message.starts_with("!delete") {
                 let _ = c.send_privmsg(&channel, "This feature is still being worked on.");
             } else if message.starts_with("!help") {
@@ -58,14 +65,4 @@ async fn main() -> Result<(), Error> {
     });
 
     reactor.run().unwrap();
-    Ok(())
 }
-
-// async fn insert_post(client: &Client, nick: &str, user_msg: &str) -> String {
-//     let rows2 = pg_client.query(
-//         "INSERT INTO posts (nick, post_title) VALUES ('$1', '$2')",
-//         &[&src_nick, &user_msg]
-//     ).await?;
-//     let value: &str = rows2[0].get(0);
-//     println!("{}", value);
-// }
