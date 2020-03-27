@@ -13,20 +13,29 @@ fn main() {
     let irc_client = reactor.prepare_client_and_connect(&irc_config).unwrap();
     irc_client.identify().unwrap();
 
-    reactor.register_client_with_handler(irc_client, |c, m| {
+    reactor.register_client_with_handler(irc_client, move |c, m| {
         // Connect to database
-        let mut pg_client = Client::connect("host=localhost user=postgres password=postgres dbname=communitybot", NoTls).unwrap();
+        let pg_conn = format!(
+            "host={} user={} password={} dbname={}",
+            irc_config.get_option("db_host").unwrap(),
+            irc_config.get_option("db_user").unwrap(),
+            irc_config.get_option("db_pass").unwrap(),
+            irc_config.get_option("db_name").unwrap(),
+        );
+        let mut pg_client = Client::connect(&pg_conn, NoTls).unwrap();
+
+        let src_nick = &m.source_nickname().unwrap_or("none");
+        let res_target = &m.response_target().unwrap_or("none");
 
         if let Command::NOTICE(channel, message) = &m.command {
-            println!("[{:?}][{}]: {}", &m.response_target(), &channel, &message);
+            println!("[{:?}][{}]: {}", res_target, &channel, &message);
         }
 
         if let Command::PRIVMSG(channel, message) = &m.command {
-            let src_nick = &m.source_nickname().unwrap();
-            let res_target = &m.response_target().unwrap();
+
 
             let help_msg = vec![
-                format!("Hey there {}, here's what you can do.", &m.source_nickname().unwrap()),
+                format!("Hey there {}, here's what you can do.", res_target),
                 "Say '!create' followed by the title of your listing to create a new one.".to_string(),
                 "Example: '!create I am offering virtual guitar lessons/sessions'.".to_string(),
                 "Say '!delete' followed by the name or ID of an existing listing.".to_string(),
@@ -49,10 +58,10 @@ fn main() {
                 match query_res {
                     Ok(row) => {
                         let post_id: i32 = row.get("id");
-                        c.send_privmsg(&channel, format!("Created new post: {}!", post_id));
+                        let _ = c.send_privmsg(&channel, format!("Created new post: {}", post_id));
                     },
                     Err(err) => {
-                        c.send_privmsg(&channel, format!("There was an error storing to DB! {}", err));
+                        let _ = c.send_privmsg(&channel, format!("There was an error storing to DB! {}", err));
                     }
                 };
             } else if message.starts_with("!delete") {

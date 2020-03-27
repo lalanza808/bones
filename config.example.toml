@@ -5,3 +5,9 @@ port = 6697
 use_ssl = true
 channels = ["#random"]
 user_info = "I'm a test bot. Leave me be."
+
+[options]
+db_host = "localhost"
+db_user = "postgres"
+db_pass = "postgres"
+db_name = "communitybot"
